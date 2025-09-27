@@ -87,6 +87,18 @@ COPY <<EOF /etc/supervisor/conf.d/supervisord.conf
 [supervisord]
 nodaemon=true
 user=root
+pidfile=/var/run/supervisor/supervisord.pid
+serverurl=unix:///var/run/supervisor/supervisor.sock
+
+[unix_http_server]
+file=/var/run/supervisor/supervisor.sock
+chmod=0700
+
+[supervisorctl]
+serverurl=unix:///var/run/supervisor/supervisor.sock
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 [program:xvfb]
 command=Xvfb :1 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset
@@ -108,6 +120,8 @@ command=x11vnc -display :1 -forever -shared -rfbport 5901 -nopw -noxdamage -noxf
 environment=DISPLAY=:1
 autostart=true
 autorestart=true
+startsecs=5
+startretries=10
 stdout_logfile=/var/log/x11vnc.log
 stderr_logfile=/var/log/x11vnc_error.log
 
@@ -133,8 +147,15 @@ COPY <<'EOF' /start.sh
 #!/bin/bash
 
 # Create necessary directories
-mkdir -p /var/log /tmp/.X11-unix
+mkdir -p /var/log /tmp/.X11-unix /var/run/supervisor
 chmod 1777 /tmp/.X11-unix
+
+# Clean up any existing X11 locks and processes
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
+pkill -f "Xvfb\|x11vnc" || true
+
+# Wait a moment for cleanup
+sleep 2
 
 # Wait a moment for services to initialize
 echo "Starting AI Web Agent services..."

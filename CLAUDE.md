@@ -207,3 +207,4 @@ cd frontend && npm start
 - WebSocket message batching
 - VNC frame rate optimization
 - AI response caching for common patterns
+- Docker runs in remote, you should ask me for logs
