@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     chromium-browser chromium-chromedriver \
     # VNC and GUI
     xvfb x11vnc fluxbox \
-    xterm \
+    xterm x11-utils \
     # Network tools
     curl wget git \
     # Utilities
@@ -101,27 +101,32 @@ serverurl=unix:///var/run/supervisor/supervisor.sock
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
 [program:xvfb]
-command=Xvfb :1 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset
+command=bash -c "rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 && exec Xvfb :1 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
 autostart=true
 autorestart=true
+priority=10
+startsecs=3
 stdout_logfile=/var/log/xvfb.log
 stderr_logfile=/var/log/xvfb_error.log
 
 [program:fluxbox]
-command=fluxbox -display :1
+command=bash -c "while ! xdpyinfo -display :1 >/dev/null 2>&1; do sleep 1; done && exec fluxbox -display :1"
 environment=DISPLAY=:1
 autostart=true
 autorestart=true
+priority=20
+startsecs=2
 stdout_logfile=/var/log/fluxbox.log
 stderr_logfile=/var/log/fluxbox_error.log
 
 [program:x11vnc]
-command=x11vnc -display :1 -forever -shared -rfbport 5901 -nopw -noxdamage -noxfixes -noxcomposite
+command=bash -c "while ! xdpyinfo -display :1 >/dev/null 2>&1; do sleep 1; done && exec x11vnc -display :1 -forever -shared -rfbport 5901 -nopw -noxdamage -noxfixes -noxcomposite"
 environment=DISPLAY=:1
 autostart=true
 autorestart=true
+priority=30
 startsecs=5
-startretries=10
+startretries=3
 stdout_logfile=/var/log/x11vnc.log
 stderr_logfile=/var/log/x11vnc_error.log
 
