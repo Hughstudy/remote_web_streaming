@@ -4,7 +4,7 @@ uvicorn[standard]>=0.24.0
 websockets>=12.0
 
 # Browser automation
-browser-use>=0.1.18
+browser-use>=0.1.48
 playwright>=1.48.0
 
 # AI/LLM integration

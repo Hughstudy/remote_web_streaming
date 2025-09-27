@@ -114,7 +114,7 @@ stderr_logfile=/var/log/x11vnc_error.log
 [program:backend]
 command=/app/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 directory=/app
-environment=DISPLAY=:1,PATH="/app/venv/bin:%(ENV_PATH)s"
+environment=DISPLAY=:1,PATH="/app/venv/bin:%(ENV_PATH)s",OPENAI_API_KEY="%(ENV_OPENAI_API_KEY)s",OPENAI_BASE_URL="%(ENV_OPENAI_BASE_URL)s"
 autostart=true
 autorestart=true
 stdout_logfile=/var/log/backend.log

@@ -48,31 +48,26 @@ class BrowserService:
 
             # Initialize browser-use agent with AI provider
             openai_api_key = os.getenv("OPENAI_API_KEY")
-            openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+            openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
             if openai_api_key:
-                # Use OpenAI directly
+                # Use Gemini 2.5 Flash model (works with both OpenAI and OpenRouter)
+                model = "google/gemini-2.5-flash" if "openrouter" in openai_base_url else "gpt-4o"
+
                 llm = ChatOpenAI(
-                    model="gpt-4o",
-                    api_key=openai_api_key
-                )
-            elif openrouter_api_key:
-                # Use OpenRouter with Gemini 2.5 Flash (recommended)
-                llm = ChatOpenAI(
-                    model="google/gemini-2.5-flash",  # Gemini 2.5 Flash via OpenRouter
-                    api_key=openrouter_api_key,
-                    base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+                    model=model,
+                    api_key=openai_api_key,
+                    base_url=openai_base_url
                 )
             else:
                 llm = None
-                print("Warning: No AI API key configured")
+                print("Warning: No OPENAI_API_KEY configured")
 
             if llm:
-                # Create agent that will use our browser instance
+                # Create agent with the updated API (no browser parameter needed)
                 self.agent = Agent(
                     task="",  # Will be set when executing tasks
-                    llm=llm,
-                    browser=self.browser  # Pass our browser instance
+                    llm=llm
                 )
 
             print("Browser service started successfully")
