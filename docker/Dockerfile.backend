@@ -1,0 +1,78 @@
+FROM python:3.11-slim
+
+# Install system dependencies for browser automation and VNC
+RUN apt-get update && apt-get install -y \
+    # Browser dependencies
+    wget \
+    gnupg \
+    ca-certificates \
+    procps \
+    xvfb \
+    x11vnc \
+    fluxbox \
+    # Playwright dependencies
+    libnss3-dev \
+    libatk-bridge2.0-dev \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libxss1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Chrome
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies with uv
+RUN pip install uv
+RUN uv pip install --system -r requirements.txt
+
+# Install Playwright browsers
+RUN playwright install chromium --with-deps
+
+# Copy application code
+COPY backend/ ./backend/
+COPY .env* ./
+
+# Create VNC directory
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+
+# Expose ports
+EXPOSE 8000 5901
+
+# Set environment variables
+ENV DISPLAY=:1
+ENV BROWSER_HEADLESS=false
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+# Start Xvfb\n\
+Xvfb :1 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset &\n\
+\n\
+# Wait for display to be ready\n\
+sleep 2\n\
+\n\
+# Start window manager\n\
+DISPLAY=:1 fluxbox &\n\
+\n\
+# Start VNC server\n\
+x11vnc -display :1 -noxdamage -noxfixes -noxcomposite -forever -shared -rfbport 5901 -bg -nopw\n\
+\n\
+# Start FastAPI application\n\
+cd /app && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000\n\
+' > /start.sh && chmod +x /start.sh
+
+CMD ["/start.sh"]
