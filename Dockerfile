@@ -41,7 +41,7 @@ COPY backend/ ./backend/
 
 # Install Node.js dependencies and build frontend
 COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
+RUN cd frontend && npm install
 
 COPY frontend/ ./frontend/
 RUN cd frontend && npm run build
@@ -155,13 +155,10 @@ EXPOSE 3000 8000 5901
 
 # Create .env file template
 COPY <<EOF /app/.env
-# AI API Configuration (Choose ONE)
-# Option 1: OpenRouter + Gemini 2.5 Flash (Recommended)
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-
-# Option 2: OpenAI (Alternative)
-# OPENAI_API_KEY=your_openai_api_key_here
+# AI API Configuration
+# OpenRouter using OpenAI-compatible API with Gemini 2.5 Flash
+OPENAI_API_KEY=your_openrouter_api_key_here
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
 
 # System Configuration
 DISPLAY=:1

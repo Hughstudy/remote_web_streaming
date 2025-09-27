@@ -30,9 +30,16 @@ HOST_IP=$(hostname -I | awk '{print $1}')
 
 # Run the container
 echo "🏃 Starting container..."
-docker run -d \
-    --name $CONTAINER_NAME \
-    --env-file .env \
+# Build docker run command with conditional .env file
+DOCKER_RUN_CMD="docker run -d --name $CONTAINER_NAME"
+
+# Add .env file if it exists
+if [ -f ".env" ]; then
+    DOCKER_RUN_CMD="$DOCKER_RUN_CMD --env-file .env"
+fi
+
+# Add environment variables and other options
+DOCKER_RUN_CMD="$DOCKER_RUN_CMD \
     -e OPENAI_API_KEY \
     -e OPENAI_BASE_URL \
     -p 3000:3000 \
@@ -41,7 +48,10 @@ docker run -d \
     --privileged \
     --shm-size=2gb \
     -v /dev/shm:/dev/shm \
-    $IMAGE_NAME
+    $IMAGE_NAME"
+
+# Execute the command
+eval $DOCKER_RUN_CMD
 
 if [ $? -eq 0 ]; then
     echo "✅ Container started successfully!"
