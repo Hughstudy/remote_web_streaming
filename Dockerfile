@@ -5,9 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    # Python and Node.js
+    # Python dependencies
     python3.11 python3.11-venv python3-pip python3.11-dev \
-    nodejs npm \
     # Browser automation
     wget gnupg ca-certificates procps \
     chromium-browser chromium-chromedriver \
@@ -19,6 +18,12 @@ RUN apt-get update && apt-get install -y \
     # Utilities
     supervisor nginx \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 18.x from NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && node --version \
+    && npm --version
 
 # Set up working directory
 WORKDIR /app
