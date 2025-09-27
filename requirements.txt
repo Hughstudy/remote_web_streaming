@@ -16,8 +16,8 @@ python-dotenv>=1.0.0
 pydantic>=2.5.0
 Pillow>=10.1.0
 
-# VNC and streaming
-pyvnc>=0.1.0
+# VNC and streaming (using standard VNC libraries)
+vncdotool>=1.2.0
 asyncio-mqtt>=0.16.0
 
 # Optional dependencies
