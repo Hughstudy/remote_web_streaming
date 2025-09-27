@@ -5,7 +5,8 @@ from typing import Dict, List
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from .services.browser_service import BrowserService
@@ -33,6 +34,10 @@ async def lifespan(app: FastAPI):
 
     # Only start browser service - VNC is managed by supervisor in all-in-one mode
     await browser_service.start()
+
+    # Connect AI service to browser service
+    ai_service.browser_service = browser_service
+
     # Don't start vnc_service - it's managed by supervisor
 
     yield
@@ -56,6 +61,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount noVNC files
+app.mount("/novnc", StaticFiles(directory="/app/novnc"), name="novnc")
 
 @app.get("/api/health")
 async def health_check():
@@ -156,16 +164,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/", response_class=HTMLResponse)
 async def frontend():
-    """Embedded frontend - no static files needed!"""
+    """Embedded frontend with noVNC client - no static files needed!"""
     return HTMLResponse(content="""<!DOCTYPE html>
 <html>
 <head>
-    <title>AI Web Agent - Ultra Simple</title>
+    <title>AI Web Agent - With VNC Streaming</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Load noVNC using proper ES6 modules -->
     <style>
         body { font-family: monospace; margin: 20px; background: #1a1a1a; color: #00ff00; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1400px; margin: 0 auto; }
         h1 { color: #00ffff; text-align: center; margin-bottom: 20px; }
         .status { padding: 15px; margin: 10px 0; border-radius: 8px; font-weight: bold; }
         .status.connected { background: #0f4f0f; color: #00ff00; }
@@ -174,7 +183,45 @@ async def frontend():
         .controls { margin: 20px 0; display: flex; gap: 10px; align-items: center; }
         input { flex: 1; padding: 12px; background: #333; border: 1px solid #555; color: #00ff00; font-family: inherit; }
         button { padding: 12px 20px; background: #0066cc; color: white; border: none; cursor: pointer; font-weight: bold; }
-        .vnc-display { background: #000; min-height: 400px; border: 2px solid #333; margin: 20px 0; display: flex; align-items: center; justify-content: center; color: white; }
+        .vnc-display {
+            background: #000;
+            min-height: 600px;
+            border: 2px solid #333;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+        .vnc-container {
+            width: 100%;
+            height: 600px;
+            position: relative;
+            overflow: hidden;
+        }
+        #vnc-screen {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .vnc-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 5px;
+        }
+        .vnc-btn {
+            padding: 5px 10px;
+            background: rgba(0,100,200,0.8);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
         .logs { background: #111; border: 1px solid #333; padding: 10px; height: 200px; overflow-y: auto; font-size: 12px; margin-top: 20px; }
     </style>
 </head>
@@ -186,23 +233,34 @@ async def frontend():
         <div class="controls">
             <input type="text" id="taskInput" placeholder="Enter AI task (e.g., search iPhone 17)" onkeydown="if(event.key==='Enter') submitTask()">
             <button onclick="submitTask()">🚀 Execute</button>
-            <button onclick="getVNCInfo()">🖥️ Get VNC</button>
+            <button onclick="connectVNC()">🖥️ Connect VNC</button>
         </div>
 
         <div id="vnc-display" class="vnc-display">
-            <div style="text-align: center;">
+            <div id="vnc-startup-msg" style="text-align: center;">
                 <div style="font-size: 48px; margin-bottom: 20px;">🖥️</div>
                 <div>Remote Browser Display</div>
-                <div style="margin-top: 10px;">Click "Get VNC" to connect</div>
+                <div style="margin-top: 10px;">Click "Connect VNC" to start streaming</div>
+            </div>
+            <div id="vnc-container" class="vnc-container" style="display: none;">
+                <div class="vnc-controls">
+                    <button class="vnc-btn" onclick="disconnectVNC()">Disconnect</button>
+                    <button class="vnc-btn" onclick="takeScreenshot()">Screenshot</button>
+                </div>
+                <div id="vnc-screen" style="width: 100%; height: 100%; background: #000;"></div>
             </div>
         </div>
 
         <div id="logs" class="logs"></div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import RFB from noVNC using ES6 modules
+        import RFB from '/novnc/core/rfb.js';
+
         let ws = null;
         let vncInfo = null;
+        let rfb = null;
 
         function log(msg) {
             const logs = document.getElementById('logs');
@@ -219,7 +277,29 @@ async def frontend():
             log(`STATUS: ${status}`);
         }
 
-        async function getVNCInfo() {
+        function connectedToServer(e) {
+            log('✅ VNC connected successfully!');
+            updateStatus('VNC Connected - Browser streaming active', 'connected');
+        }
+
+        function disconnectedFromServer(e) {
+            if (e.detail.clean) {
+                log('🔌 VNC disconnected cleanly');
+                updateStatus('VNC Disconnected', 'error');
+            } else {
+                log('❌ VNC connection lost unexpectedly');
+                updateStatus('VNC Connection Lost', 'error');
+            }
+            showStartupMessage();
+        }
+
+        function credentialsRequired(e) {
+            log('🔐 VNC credentials required');
+            // Send empty password since VNC server has no password
+            rfb.sendCredentials({ password: '' });
+        }
+
+        async function connectVNC() {
             try {
                 log('📡 Getting VNC info...');
                 const response = await fetch('/vnc_info');
@@ -227,26 +307,66 @@ async def frontend():
 
                 if (data.type === 'vnc_info' && data.data) {
                     vncInfo = data.data;
-                    log(`✅ VNC ready: ${vncInfo.ws_url}`);
-                    updateStatus(`VNC Ready: ${vncInfo.ws_url}`, 'connected');
+                    log(`✅ VNC info received: ${vncInfo.ws_url}`);
 
-                    document.getElementById('vnc-display').innerHTML = `
-                        <div style="text-align: center; color: white; padding: 20px;">
-                            <div style="font-size: 24px; margin-bottom: 20px;">🖥️ VNC Info</div>
-                            <div style="background: rgba(0,255,0,0.1); padding: 15px;">
-                                <div><strong>WebSocket URL:</strong> ${vncInfo.ws_url}</div>
-                                <div><strong>Resolution:</strong> ${vncInfo.width}x${vncInfo.height}</div>
-                                <div><strong>Display:</strong> ${vncInfo.display}</div>
-                            </div>
-                            <div style="margin-top: 15px; color: #aaa;">
-                                Connect VNC client to: localhost:5901
-                            </div>
-                        </div>
-                    `;
+                    // Hide startup message and show VNC container
+                    document.getElementById('vnc-startup-msg').style.display = 'none';
+                    document.getElementById('vnc-container').style.display = 'block';
+
+                    // Create RFB connection using official example pattern
+                    const target = document.getElementById('vnc-screen');
+                    const url = vncInfo.ws_url;
+
+                    log(`🔄 Connecting to VNC: ${url}`);
+                    updateStatus('Connecting to VNC...', 'info');
+
+                    rfb = new RFB(target, url);
+
+                    // Event listeners based on official documentation
+                    rfb.addEventListener('connect', connectedToServer);
+                    rfb.addEventListener('disconnect', disconnectedFromServer);
+                    rfb.addEventListener('credentialsrequired', credentialsRequired);
+
+                    // Optional settings
+                    rfb.scaleViewport = true;
+                    rfb.resizeSession = false;
                 }
             } catch (error) {
-                log(`❌ Failed to get VNC info: ${error.message}`);
-                updateStatus('VNC Info Failed', 'error');
+                log(`❌ Failed to connect VNC: ${error.message}`);
+                updateStatus('VNC Connection Failed', 'error');
+                showStartupMessage();
+            }
+        }
+
+        function disconnectVNC() {
+            if (rfb) {
+                log('🔌 Disconnecting VNC...');
+                rfb.disconnect();
+                rfb = null;
+            }
+            showStartupMessage();
+        }
+
+        function showStartupMessage() {
+            document.getElementById('vnc-startup-msg').style.display = 'block';
+            document.getElementById('vnc-container').style.display = 'none';
+        }
+
+        function takeScreenshot() {
+            if (rfb) {
+                log('📸 Taking screenshot...');
+                // Find the canvas element inside the noVNC display
+                const vncCanvas = document.querySelector('#vnc-screen canvas');
+                if (vncCanvas) {
+                    const dataURL = vncCanvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = `vnc-screenshot-${new Date().toISOString().slice(0,19)}.png`;
+                    link.href = dataURL;
+                    link.click();
+                    log('✅ Screenshot saved');
+                } else {
+                    log('❌ No canvas found for screenshot');
+                }
             }
         }
 
@@ -342,7 +462,12 @@ async def frontend():
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             log('🚀 AI Web Agent initialized');
-            updateStatus('Ready - Click "Get VNC" to connect', 'connected');
+            updateStatus('Ready - Click "Connect VNC" to start streaming', 'connected');
+
+            // Auto-connect VNC on startup
+            setTimeout(() => {
+                connectVNC();
+            }, 1000);
         });
     </script>
 </body>

@@ -27,6 +27,13 @@ RUN uv pip install -r requirements.txt
 # Install Playwright browsers
 RUN playwright install chromium --with-deps
 
+# Download noVNC from GitHub (proper ES6 modules)
+RUN cd /app && \
+    wget -O novnc.tar.gz https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz && \
+    tar -xzf novnc.tar.gz && \
+    mv noVNC-1.4.0 novnc && \
+    rm novnc.tar.gz
+
 # Copy backend code
 COPY backend/ ./backend/
 

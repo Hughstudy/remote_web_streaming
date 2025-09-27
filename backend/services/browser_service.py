@@ -1,18 +1,13 @@
 import asyncio
 import os
 from typing import Optional
-from browser_use import Agent, ChatOpenAI
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from browser_use import Agent, ChatOpenAI, BrowserProfile
 
 
 class BrowserService:
     """Service for managing browser automation using browser-use"""
 
     def __init__(self):
-        self.browser: Optional[Browser] = None
-        self.context: Optional[BrowserContext] = None
-        self.page: Optional[Page] = None
-        self.playwright = None
         self.agent: Optional[Agent] = None
 
         # Configuration from environment
@@ -21,33 +16,10 @@ class BrowserService:
         self.height = int(os.getenv("BROWSER_HEIGHT", "1080"))
 
     async def start(self):
-        """Initialize browser and browser-use agent"""
+        """Initialize browser-use agent with VNC display configuration"""
         try:
             # Ensure browser runs on VNC display
             os.environ["DISPLAY"] = ":1"
-
-            # Start Playwright
-            self.playwright = await async_playwright().start()
-
-            # Launch browser with display settings for VNC
-            self.browser = await self.playwright.chromium.launch(
-                headless=self.headless,
-                args=[
-                    f"--window-size={self.width},{self.height}",
-                    "--disable-web-security",
-                    "--disable-features=VizDisplayCompositor",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage"
-                ]
-            )
-
-            # Create browser context
-            self.context = await self.browser.new_context(
-                viewport={"width": self.width, "height": self.height}
-            )
-
-            # Create initial page
-            self.page = await self.context.new_page()
 
             # Initialize browser-use agent with AI provider
             openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -63,17 +35,31 @@ class BrowserService:
                     base_url=openai_base_url
                 )
             else:
-                llm = None
-                print("Warning: No OPENAI_API_KEY configured")
+                raise Exception("No OPENAI_API_KEY configured")
 
-            if llm:
-                # Create agent with the updated API (no browser parameter needed)
-                self.agent = Agent(
-                    task="",  # Will be set when executing tasks
-                    llm=llm
-                )
+            # Create browser profile for VNC display
+            browser_profile = BrowserProfile(
+                headless=self.headless,
+                window_size={'width': self.width, 'height': self.height},
+                viewport={'width': self.width, 'height': self.height},
+                env={'DISPLAY': ':1'},  # Ensure VNC display
+                args=[
+                    "--disable-web-security",
+                    "--disable-features=VizDisplayCompositor",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage"
+                ],
+                keep_alive=True  # Keep browser running between tasks
+            )
 
-            print("Browser service started successfully")
+            # Create agent - browser-use will handle browser creation
+            self.agent = Agent(
+                task="",  # Will be set when executing tasks
+                llm=llm,
+                browser_profile=browser_profile
+            )
+
+            print("Browser service started successfully with browser-use")
 
         except Exception as e:
             print(f"Error starting browser service: {e}")
@@ -82,38 +68,30 @@ class BrowserService:
     async def stop(self):
         """Clean up browser resources"""
         try:
-            if self.context:
-                await self.context.close()
-            if self.browser:
-                await self.browser.close()
-            if self.playwright:
-                await self.playwright.stop()
+            # browser-use handles browser cleanup internally
+            if self.agent:
+                # Gracefully close agent if it has cleanup methods
+                pass
             print("Browser service stopped")
         except Exception as e:
             print(f"Error stopping browser service: {e}")
 
-    async def navigate_to(self, url: str):
-        """Navigate to a specific URL"""
-        if self.page:
-            await self.page.goto(url)
-            return await self.page.url
+    async def execute_task(self, instruction: str, max_steps: int = 10):
+        """Execute a task using browser-use agent"""
+        if not self.agent:
+            raise Exception("Browser service not started")
 
-    async def get_page_info(self):
-        """Get current page information"""
-        if self.page:
-            return {
-                "url": self.page.url,
-                "title": await self.page.title(),
-                "viewport": self.page.viewport_size
-            }
-        return None
+        try:
+            # Update agent task
+            self.agent.task = instruction
 
-    async def take_screenshot(self) -> bytes:
-        """Take a screenshot of the current page"""
-        if self.page:
-            return await self.page.screenshot()
-        return None
+            # Execute the task
+            result = await self.agent.run(max_steps=max_steps)
+            return result
+        except Exception as e:
+            print(f"Error executing task: {e}")
+            raise
 
-    def get_browser_instance(self):
-        """Get the browser instance for agent use"""
-        return self.browser
+    def get_agent(self):
+        """Get the browser-use agent instance"""
+        return self.agent
