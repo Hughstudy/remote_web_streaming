@@ -14,18 +14,14 @@ class AIService:
         self.tasks: Dict[str, Dict] = {}
         self.agents: Dict[str, Agent] = {}
 
-        # Initialize AI client (OpenAI or OpenRouter)
+        # Initialize AI client (OpenRouter via OpenAI-compatible API)
         openai_api_key = os.getenv("OPENAI_API_KEY")
-        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
         if openai_api_key:
-            # Use OpenAI directly
-            self.openai_client = AsyncOpenAI(api_key=openai_api_key)
-        elif openrouter_api_key:
-            # Use OpenRouter as OpenAI-compatible API
             self.openai_client = AsyncOpenAI(
-                api_key=openrouter_api_key,
-                base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+                api_key=openai_api_key,
+                base_url=openai_base_url
             )
 
     async def create_task(self, instruction: str) -> str:
@@ -61,25 +57,20 @@ class AIService:
         try:
             # Create AI agent for this task
             if self.openai_client:
-                # Determine which API to use and set appropriate model
                 openai_api_key = os.getenv("OPENAI_API_KEY")
-                openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+                openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
-                if openai_api_key:
-                    # Use OpenAI directly
-                    llm = ChatOpenAI(
-                        model="gpt-4o",
-                        api_key=openai_api_key
-                    )
-                elif openrouter_api_key:
-                    # Use OpenRouter with Gemini 2.5 Flash (recommended)
-                    llm = ChatOpenAI(
-                        model="google/gemini-2.5-flash",  # Gemini 2.5 Flash via OpenRouter
-                        api_key=openrouter_api_key,
-                        base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-                    )
-                else:
-                    raise ValueError("No AI API key configured")
+                if not openai_api_key:
+                    raise ValueError("No OPENAI_API_KEY configured")
+
+                # Use Gemini 2.5 Flash model (works with both OpenAI and OpenRouter)
+                model = "google/gemini-2.5-flash" if "openrouter" in openai_base_url else "gpt-4o"
+
+                llm = ChatOpenAI(
+                    model=model,
+                    api_key=openai_api_key,
+                    base_url=openai_base_url
+                )
 
                 agent = Agent(
                     task=task["instruction"],
@@ -176,8 +167,12 @@ class AIService:
                     ]
                 })
 
+            # Use the same model selection logic
+            openai_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            model = "google/gemini-2.5-flash" if "openrouter" in openai_base_url else "gpt-4o"
+
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model=model,
                 messages=messages,
                 max_tokens=1000
             )

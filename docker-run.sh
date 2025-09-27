@@ -5,24 +5,9 @@
 echo "🚀 Starting AI Web Agent All-in-One Container"
 echo "============================================="
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker first."
-    exit 1
-fi
-
 # Set default values
 CONTAINER_NAME="ai-web-agent"
 IMAGE_NAME="ai-web-agent:latest"
-
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    echo "📝 Creating .env file from template..."
-    cp .env.example .env
-    echo "⚠️  Please edit .env file with your API keys before running again!"
-    echo "   Required: OPENROUTER_API_KEY or OPENAI_API_KEY"
-    exit 1
-fi
 
 # Stop and remove existing container if it exists
 if docker ps -a --format 'table {{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
@@ -48,6 +33,8 @@ echo "🏃 Starting container..."
 docker run -d \
     --name $CONTAINER_NAME \
     --env-file .env \
+    -e OPENAI_API_KEY \
+    -e OPENAI_BASE_URL \
     -p 3000:3000 \
     -p 8000:8000 \
     -p 5901:5901 \
