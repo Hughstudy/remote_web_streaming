@@ -50,7 +50,7 @@ RUN cd frontend && npm run build
 COPY <<EOF /etc/nginx/sites-available/frontend
 server {
     listen 3000;
-    root /app/frontend/build;
+    root /app/frontend/dist;
     index index.html;
 
     location / {
