@@ -23,6 +23,9 @@ class BrowserService:
     async def start(self):
         """Initialize browser and browser-use agent"""
         try:
+            # Ensure browser runs on VNC display
+            os.environ["DISPLAY"] = ":1"
+
             # Start Playwright
             self.playwright = await async_playwright().start()
 

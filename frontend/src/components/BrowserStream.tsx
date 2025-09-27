@@ -59,8 +59,8 @@ const BrowserStream: React.FC<BrowserStreamProps> = ({ vncInfo, className = '' }
       // Clear any existing connection
       disconnectVNC();
 
-      // Create WebSocket URL for noVNC
-      const wsUrl = `ws://${vncInfo.host}:${vncInfo.port + 1000}`;
+      // Use WebSocket URL provided by backend
+      const wsUrl = vncInfo.ws_url;
 
       // Create RFB connection
       rfbRef.current = new window.RFB(canvasRef.current, wsUrl, {

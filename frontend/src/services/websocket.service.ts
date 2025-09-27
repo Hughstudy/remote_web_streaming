@@ -4,7 +4,7 @@ class WebSocketService {
   private socket: WebSocket | null = null;
   private messageHandlers: Map<string, (message: WebSocketMessage) => void> = new Map();
 
-  connect(url: string = `ws://${window.location.hostname}:8000/ws`): Promise<void> {
+  connect(url: string = `ws://${window.location.hostname}:${window.location.port}/ws`): Promise<void> {
     return new Promise((resolve, reject) => {
       this.socket = new WebSocket(url);
 

@@ -14,27 +14,67 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize WebSocket connection
+  // MINIMAL WEBSOCKET TEST - BYPASSING SERVICE
   useEffect(() => {
-    const initializeConnection = async () => {
-      try {
-        await websocketService.connect();
-        setIsConnected(true);
-        setError(null);
+    console.log('🔍 REACT USEEFFECT RUNNING - React is rendering!');
 
-        // Request VNC info on connection
-        websocketService.getVNCInfo();
-      } catch (err) {
-        console.error('Failed to connect to WebSocket:', err);
-        setError('Failed to connect to server');
-        setIsConnected(false);
+    // Add visible proof that React rendered
+    const proofElement = document.createElement('div');
+    proofElement.id = 'react-proof';
+    proofElement.style.cssText = 'position:fixed;top:0;left:0;background:red;color:white;padding:10px;z-index:9999;font-family:monospace;';
+    proofElement.textContent = '✅ REACT IS RENDERING! useEffect executed at ' + new Date().toISOString();
+    document.body.appendChild(proofElement);
+
+    // Direct WebSocket test without service wrapper
+    const testWebSocket = () => {
+      console.log('🔍 Attempting direct WebSocket connection...');
+
+      try {
+        const ws = new WebSocket('ws://localhost:3000/ws');
+
+        ws.onopen = () => {
+          console.log('🔍 ✅ DIRECT WEBSOCKET CONNECTED!');
+          setIsConnected(true);
+          setError(null);
+
+          // Update proof element
+          proofElement.textContent += ' | ✅ WEBSOCKET CONNECTED!';
+          proofElement.style.background = 'green';
+
+          // Send test message
+          ws.send(JSON.stringify({type: 'get_vnc_info'}));
+          console.log('🔍 Sent get_vnc_info message');
+        };
+
+        ws.onmessage = (event) => {
+          console.log('🔍 📥 WebSocket message received:', event.data);
+          // This should trigger VNC info update
+        };
+
+        ws.onerror = (error) => {
+          console.log('🔍 ❌ WebSocket error:', error);
+          proofElement.textContent += ' | ❌ WS ERROR!';
+          proofElement.style.background = 'orange';
+          setError('WebSocket connection failed');
+          setIsConnected(false);
+        };
+
+        ws.onclose = (event) => {
+          console.log('🔍 🔌 WebSocket closed:', event.code, event.reason);
+          setIsConnected(false);
+        };
+
+      } catch (e) {
+        console.log('🔍 ❌ Exception creating WebSocket:', e);
+        setError('WebSocket creation failed: ' + e.message);
       }
     };
 
-    initializeConnection();
+    // Test immediately
+    testWebSocket();
 
     return () => {
-      websocketService.disconnect();
+      console.log('🔍 useEffect cleanup');
     };
   }, []);
 

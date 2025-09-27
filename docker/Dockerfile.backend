@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     x11vnc \
     fluxbox \
+    # WebSocket proxy for noVNC
+    websockify \
     # Playwright dependencies
     libnss3-dev \
     libatk-bridge2.0-dev \
@@ -23,11 +25,9 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
+# Install Chromium (cross-platform alternative to Chrome)
+RUN apt-get update \
+    && apt-get install -y chromium \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up working directory
@@ -51,7 +51,7 @@ COPY .env* ./
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 # Expose ports
-EXPOSE 8000 5901
+EXPOSE 8000 5901 6901
 
 # Set environment variables
 ENV DISPLAY=:1
@@ -70,6 +70,9 @@ DISPLAY=:1 fluxbox &\n\
 \n\
 # Start VNC server\n\
 x11vnc -display :1 -noxdamage -noxfixes -noxcomposite -forever -shared -rfbport 5901 -bg -nopw\n\
+\n\
+# Start WebSocket proxy for noVNC\n\
+websockify 6901 localhost:5901 &\n\
 \n\
 # Start FastAPI application\n\
 cd /app && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000\n\

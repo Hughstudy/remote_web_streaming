@@ -13,6 +13,7 @@ class AIService:
         self.openai_client: Optional[AsyncOpenAI] = None
         self.tasks: Dict[str, Dict] = {}
         self.agents: Dict[str, Agent] = {}
+        self.current_running_task: Optional[str] = None
 
         # Initialize AI client (OpenRouter via OpenAI-compatible API)
         openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -26,6 +27,12 @@ class AIService:
 
     async def create_task(self, instruction: str) -> str:
         """Create a new AI task"""
+        # Check if there's already a running task
+        if self.current_running_task and self.current_running_task in self.tasks:
+            current_task = self.tasks[self.current_running_task]
+            if current_task["status"] == "running":
+                raise ValueError("Cannot create new task: another task is currently running")
+
         task_id = str(uuid.uuid4())
 
         self.tasks[task_id] = {
@@ -44,8 +51,14 @@ class AIService:
             yield {"type": "error", "message": "Task not found"}
             return
 
+        # Check if another task is already running
+        if self.current_running_task and self.current_running_task != task_id:
+            yield {"type": "error", "message": "Another task is currently running"}
+            return
+
         task = self.tasks[task_id]
         task["status"] = "running"
+        self.current_running_task = task_id
 
         yield {
             "type": "task_update",
@@ -85,6 +98,7 @@ class AIService:
 
                 # Mark task as completed
                 task["status"] = "completed"
+                self.current_running_task = None  # Clear running task
                 yield {
                     "type": "task_complete",
                     "task_id": task_id,
@@ -93,6 +107,7 @@ class AIService:
 
         except Exception as e:
             task["status"] = "failed"
+            self.current_running_task = None  # Clear running task
             yield {
                 "type": "error",
                 "task_id": task_id,
@@ -102,36 +117,73 @@ class AIService:
     async def _execute_agent_task(self, agent: Agent, task_id: str) -> AsyncGenerator[Dict, None]:
         """Execute browser-use agent task with streaming updates"""
         try:
-            # Run the agent and capture steps
-            history = await agent.run(max_steps=20)
+            # Yield start message
+            yield {
+                "type": "step_update",
+                "task_id": task_id,
+                "step_number": 1,
+                "action": "initializing",
+                "description": "Starting browser automation..."
+            }
 
-            # Stream each step as it completes
-            for i, step in enumerate(history):
-                step_data = {
+            # Run the agent
+            history = await agent.run(max_steps=10)
+
+            # Process and yield each step
+            if history:
+                for i, step in enumerate(history):
+                    # Extract step information
+                    action = getattr(step, 'action', 'unknown') if hasattr(step, 'action') else str(type(step).__name__)
+                    result = getattr(step, 'result', '') if hasattr(step, 'result') else str(step)
+
+                    step_data = {
+                        "type": "step_update",
+                        "task_id": task_id,
+                        "step_number": i + 2,  # +2 because we start with initializing step
+                        "action": action,
+                        "description": result[:500] if result else f"Completed step {i+1}"  # Truncate long descriptions
+                    }
+
+                    self.tasks[task_id]["steps"].append(step_data)
+                    yield step_data
+
+                    # Small delay between steps
+                    await asyncio.sleep(0.1)
+
+            else:
+                # If no history, yield a completion message
+                yield {
                     "type": "step_update",
                     "task_id": task_id,
-                    "step_number": i + 1,
-                    "action": step.get("action", "unknown"),
-                    "description": step.get("result", ""),
-                    "screenshot": None  # Could add screenshot data here
+                    "step_number": 2,
+                    "action": "completed",
+                    "description": "Task completed successfully"
                 }
 
-                self.tasks[task_id]["steps"].append(step_data)
-                yield step_data
-
-                # Small delay to show progress
-                await asyncio.sleep(0.5)
-
         except Exception as e:
+            error_msg = f"Agent execution error: {str(e)}"
+            print(f"DEBUG: {error_msg}")  # Debug logging
             yield {
                 "type": "step_error",
                 "task_id": task_id,
-                "message": f"Agent execution error: {str(e)}"
+                "message": error_msg
             }
 
     async def get_task_status(self, task_id: str) -> Optional[Dict]:
         """Get current task status"""
         return self.tasks.get(task_id)
+
+    def is_task_running(self) -> bool:
+        """Check if any task is currently running"""
+        return (self.current_running_task is not None and
+                self.current_running_task in self.tasks and
+                self.tasks[self.current_running_task]["status"] == "running")
+
+    def get_running_task_id(self) -> Optional[str]:
+        """Get the ID of the currently running task"""
+        if self.is_task_running():
+            return self.current_running_task
+        return None
 
     async def analyze_with_openai(self, prompt: str, screenshot_data: bytes = None) -> str:
         """Use OpenAI to analyze screenshot and provide next action"""

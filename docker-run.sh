@@ -16,6 +16,12 @@ if docker ps -a --format 'table {{.Names}}' | grep -q "^${CONTAINER_NAME}$"; the
     docker rm $CONTAINER_NAME >/dev/null 2>&1
 fi
 
+# Remove existing image if it exists
+if docker images --format 'table {{.Repository}}:{{.Tag}}' | grep -q "^${IMAGE_NAME}$"; then
+    echo "🗑️ Removing existing image..."
+    docker rmi $IMAGE_NAME >/dev/null 2>&1
+fi
+
 # Build the image
 echo "🔨 Building Docker image..."
 docker build -t $IMAGE_NAME .
@@ -42,9 +48,9 @@ fi
 DOCKER_RUN_CMD="$DOCKER_RUN_CMD \
     -e OPENAI_API_KEY \
     -e OPENAI_BASE_URL \
-    -p 3000:3000 \
     -p 8000:8000 \
     -p 5901:5901 \
+    -p 6901:6901 \
     --privileged \
     --shm-size=2gb \
     -v /dev/shm:/dev/shm \
@@ -57,9 +63,9 @@ if [ $? -eq 0 ]; then
     echo "✅ Container started successfully!"
     echo ""
     echo "🌐 Access Points:"
-    echo "   Web UI:     http://$HOST_IP:3000"
-    echo "   API:        http://$HOST_IP:8000"
-    echo "   VNC Viewer: $HOST_IP:5901 (password: webagent)"
+    echo "   Web UI + API: http://$HOST_IP:8000"
+    echo "   VNC Viewer:   $HOST_IP:5901 (password: webagent)"
+    echo "   VNC WebSocket: ws://$HOST_IP:6901"
     echo ""
     echo "📱 Quick Test Commands:"
     echo "   curl http://$HOST_IP:8000/"

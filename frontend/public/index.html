@@ -14,5 +14,52 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+
+    <!-- IMMEDIATE WEBSOCKET TEST - BYPASSES REACT -->
+    <div id="debug-info" style="position: fixed; top: 10px; right: 10px; background: yellow; padding: 10px; z-index: 9999; font-family: monospace; font-size: 12px;">
+      <div>🔍 DEBUG: Page loaded</div>
+      <div id="js-status">❓ JavaScript status...</div>
+      <div id="ws-status">❓ WebSocket status...</div>
+    </div>
+
+    <script>
+      // IMMEDIATE EXECUTION - NO REACT DEPENDENCY
+      console.log('🔍 DEBUG: Immediate script executing');
+      document.getElementById('js-status').textContent = '✅ JavaScript running!';
+
+      // Test WebSocket connection immediately
+      setTimeout(() => {
+        console.log('🔍 DEBUG: Testing WebSocket connection...');
+        try {
+          const ws = new WebSocket('ws://localhost:3000/ws');
+
+          ws.onopen = function() {
+            console.log('🔍 DEBUG: ✅ WebSocket CONNECTED!');
+            document.getElementById('ws-status').textContent = '✅ WebSocket CONNECTED!';
+
+            // Send test message
+            ws.send(JSON.stringify({type: 'get_vnc_info'}));
+          };
+
+          ws.onmessage = function(event) {
+            console.log('🔍 DEBUG: 📥 WebSocket message:', event.data);
+            document.getElementById('ws-status').innerHTML += '<br>📥 Message received!';
+          };
+
+          ws.onerror = function(error) {
+            console.log('🔍 DEBUG: ❌ WebSocket error:', error);
+            document.getElementById('ws-status').textContent = '❌ WebSocket ERROR';
+          };
+
+          ws.onclose = function(event) {
+            console.log('🔍 DEBUG: WebSocket closed:', event.code, event.reason);
+          };
+
+        } catch (e) {
+          console.log('🔍 DEBUG: Exception:', e);
+          document.getElementById('ws-status').textContent = '❌ Exception: ' + e.message;
+        }
+      }, 2000);
+    </script>
   </body>
 </html>
