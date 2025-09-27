@@ -1,5 +1,6 @@
 import asyncio
 import os
+import glob
 from typing import Optional
 from browser_use import Agent, ChatOpenAI, BrowserProfile
 
@@ -37,13 +38,22 @@ class BrowserService:
             else:
                 raise Exception("No OPENAI_API_KEY configured")
 
+            # Find Playwright's Chromium executable
+            chromium_paths = glob.glob("/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome")
+            chromium_path = chromium_paths[0] if chromium_paths else None
+
+            if chromium_path:
+                print(f"Using Playwright Chromium at: {chromium_path}")
+            else:
+                print("Warning: No Playwright Chromium found, using default browser")
+
             # Create browser profile for VNC display - headless=False is crucial for VNC!
-            browser_profile = BrowserProfile(
-                headless=False,  # MUST be False for VNC display visibility
-                window_size={'width': self.width, 'height': self.height},
-                viewport={'width': self.width, 'height': self.height},
-                env={'DISPLAY': ':1'},  # Ensure VNC display :1
-                args=[
+            browser_profile_args = {
+                "headless": False,  # MUST be False for VNC display visibility
+                "window_size": {'width': self.width, 'height': self.height},
+                "viewport": {'width': self.width, 'height': self.height},
+                "env": {'DISPLAY': ':1'},  # Ensure VNC display :1
+                "args": [
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
@@ -53,12 +63,21 @@ class BrowserService:
                     f"--window-size={self.width},{self.height}",
                     "--ozone-platform=x11",  # Force X11 for VNC
                     "--use-gl=swiftshader",  # Software rendering for VNC
-                    "--disable-software-rasterizer"
+                    "--disable-software-rasterizer",
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-first-run",
+                    "--no-default-browser-check"
                 ],
-                chromium_sandbox=False,  # Disable sandbox in Docker
-                keep_alive=True,  # Keep browser running between tasks
-                devtools=False  # No devtools for VNC mode
-            )
+                "chromium_sandbox": False,  # Disable sandbox in Docker
+                "keep_alive": True,  # Keep browser running between tasks
+                "devtools": False  # No devtools for VNC mode
+            }
+
+            # Use Playwright Chromium if available
+            if chromium_path:
+                browser_profile_args["executable_path"] = chromium_path
+
+            browser_profile = BrowserProfile(**browser_profile_args)
 
             # Create agent - browser-use will handle browser creation
             self.agent = Agent(

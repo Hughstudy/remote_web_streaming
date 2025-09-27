@@ -2,14 +2,14 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies (no snap chromium - we'll use Playwright's)
 RUN apt-get update && apt-get install -y \
     python3.11 python3.11-venv python3-pip python3.11-dev \
     wget gnupg ca-certificates procps \
-    chromium-browser chromium-chromedriver \
     xvfb x11vnc websockify \
     xterm x11-utils \
     curl wget git \
+    libnss3 libatk-bridge2.0-0 libdrm2 libgtk-3-0 libgbm1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
