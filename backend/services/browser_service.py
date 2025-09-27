@@ -37,19 +37,27 @@ class BrowserService:
             else:
                 raise Exception("No OPENAI_API_KEY configured")
 
-            # Create browser profile for VNC display
+            # Create browser profile for VNC display - headless=False is crucial for VNC!
             browser_profile = BrowserProfile(
-                headless=self.headless,
+                headless=False,  # MUST be False for VNC display visibility
                 window_size={'width': self.width, 'height': self.height},
                 viewport={'width': self.width, 'height': self.height},
-                env={'DISPLAY': ':1'},  # Ensure VNC display
+                env={'DISPLAY': ':1'},  # Ensure VNC display :1
                 args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-extensions",
                     "--disable-web-security",
                     "--disable-features=VizDisplayCompositor",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage"
+                    f"--window-size={self.width},{self.height}",
+                    "--ozone-platform=x11",  # Force X11 for VNC
+                    "--use-gl=swiftshader",  # Software rendering for VNC
+                    "--disable-software-rasterizer"
                 ],
-                keep_alive=True  # Keep browser running between tasks
+                chromium_sandbox=False,  # Disable sandbox in Docker
+                keep_alive=True,  # Keep browser running between tasks
+                devtools=False  # No devtools for VNC mode
             )
 
             # Create agent - browser-use will handle browser creation

@@ -254,13 +254,19 @@ async def frontend():
         <div id="logs" class="logs"></div>
     </div>
 
-    <script type="module">
-        // Import RFB from noVNC using ES6 modules
-        import RFB from '/novnc/core/rfb.js';
-
+    <script>
         let ws = null;
         let vncInfo = null;
         let rfb = null;
+        let RFB = null;
+
+        // Import RFB dynamically and expose functions globally
+        import('/novnc/core/rfb.js').then(module => {
+            RFB = module.default;
+            console.log('RFB module loaded successfully');
+        }).catch(err => {
+            console.error('Failed to load RFB module:', err);
+        });
 
         function log(msg) {
             const logs = document.getElementById('logs');
@@ -319,6 +325,12 @@ async def frontend():
 
                     log(`🔄 Connecting to VNC: ${url}`);
                     updateStatus('Connecting to VNC...', 'info');
+
+                    if (!RFB) {
+                        log('❌ RFB not loaded yet, retrying in 1 second...');
+                        setTimeout(() => connectVNC(), 1000);
+                        return;
+                    }
 
                     rfb = new RFB(target, url);
 
