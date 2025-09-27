@@ -62,7 +62,48 @@ echo "Starting websockify..."
 websockify 6901 localhost:5901 &
 sleep 2
 
-# Start backend (with DISPLAY=:1 so browser runs on VNC display)
+# Start Chrome with debug port (CRUCIAL: This makes browser visible in VNC)
+echo "Starting Chrome with debug port..."
+export DISPLAY=:1
+# Find Playwright's Chromium
+CHROMIUM_PATH=$(find /app/venv/lib/python*/site-packages/playwright/driver/package/.local-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)
+if [ -z "$CHROMIUM_PATH" ]; then
+    # Fallback to system-installed locations
+    CHROMIUM_PATH=$(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || which google-chrome 2>/dev/null)
+fi
+
+if [ -n "$CHROMIUM_PATH" ]; then
+    echo "Found Chrome/Chromium at: $CHROMIUM_PATH"
+    # Launch Chrome with debug port and VNC-optimized flags
+    $CHROMIUM_PATH \
+        --remote-debugging-port=9222 \
+        --remote-debugging-address=0.0.0.0 \
+        --no-sandbox \
+        --disable-dev-shm-usage \
+        --disable-gpu \
+        --disable-extensions \
+        --disable-web-security \
+        --disable-features=VizDisplayCompositor \
+        --window-size=1920,1080 \
+        --ozone-platform=x11 \
+        --use-gl=swiftshader \
+        --disable-software-rasterizer \
+        --disable-blink-features=AutomationControlled \
+        --no-first-run \
+        --no-default-browser-check \
+        --disable-backgrounding-occluded-windows \
+        --disable-renderer-backgrounding \
+        --disable-background-timer-throttling \
+        --disable-ipc-flooding-protection \
+        --user-data-dir=/tmp/chrome-user-data \
+        about:blank &
+    sleep 5
+    echo "Chrome started with debug port 9222"
+else
+    echo "ERROR: No Chrome/Chromium found!"
+fi
+
+# Start backend (with DISPLAY=:1 so it connects to VNC display)
 echo "Starting backend..."
 export DISPLAY=:1
 exec /app/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
