@@ -321,7 +321,11 @@ async def frontend():
 
                     // Create RFB connection using official example pattern
                     const target = document.getElementById('vnc-screen');
-                    const url = vncInfo.ws_url;
+                    
+                    // Use WebSocket URL from backend, but replace hostname for remote access
+                    const remoteUrl = new URL(vncInfo.ws_url);
+                    remoteUrl.hostname = window.location.hostname;
+                    const url = remoteUrl.toString();
 
                     log(`🔄 Connecting to VNC: ${url}`);
                     updateStatus('Connecting to VNC...', 'info');
