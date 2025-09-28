@@ -75,6 +75,7 @@ if [ -n "$CHROMIUM_PATH" ]; then
         --remote-debugging-port=9222 \
         --remote-debugging-address=0.0.0.0 \
         --no-sandbox \
+        --disable-dbus \
         --disable-dev-shm-usage \
         --disable-gpu \
         --disable-extensions \
