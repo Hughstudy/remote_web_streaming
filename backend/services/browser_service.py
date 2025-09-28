@@ -9,6 +9,7 @@ class BrowserService:
 
     def __init__(self):
         self.agent: Optional[Agent] = None
+        self.browser: Optional[Browser] = None
 
         # Configuration from environment
         self.headless = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
@@ -42,16 +43,21 @@ class BrowserService:
             await self._wait_for_debug_port()
 
             # Create Browser instance to CONNECT to existing Chrome with debug port
-            browser = Browser(
-                cdp_url='http://localhost:9222'  # Connect to existing Chrome debug port
+            # keep_alive=True ensures the browser is not closed by the agent
+            self.browser = Browser(
+                cdp_url='http://localhost:9222',  # Connect to existing Chrome debug port
+                keep_alive=True
             )
 
             # Create agent - browser-use will connect to existing Chrome
             self.agent = Agent(
                 task="",  # Will be set when executing tasks
                 llm=llm,
-                browser=browser
+                browser=self.browser
             )
+
+            # Start agent services
+            await self.agent.start()
 
             print("Browser service connected to existing Chrome on debug port 9222")
 
@@ -62,11 +68,14 @@ class BrowserService:
     async def stop(self):
         """Clean up browser resources"""
         try:
-            # browser-use handles browser cleanup internally
+            # Gracefully stop the agent's services
             if self.agent:
-                # Gracefully close agent if it has cleanup methods
-                pass
-            print("Browser service stopped")
+                await self.agent.stop()
+                self.agent = None
+            
+            # We don't kill the browser here because it's managed externally
+            # and we want to reuse it. The keep_alive=True flag is important.
+            print("Browser service stopped, but browser remains alive for reuse.")
         except Exception as e:
             print(f"Error stopping browser service: {e}")
 
