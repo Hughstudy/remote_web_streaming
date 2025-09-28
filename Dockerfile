@@ -78,14 +78,13 @@ if [ -n "$CHROMIUM_PATH" ]; then
         --disable-dbus \
         --disable-dev-shm-usage \
         --disable-gpu \
-        --disable-extensions \
+        --enable-automation \
         --disable-web-security \
         --disable-features=VizDisplayCompositor \
         --window-size=1920,1080 \
         --ozone-platform=x11 \
         --use-gl=swiftshader \
         --disable-software-rasterizer \
-        --disable-blink-features=AutomationControlled \
         --no-first-run \
         --no-default-browser-check \
         --disable-backgrounding-occluded-windows \

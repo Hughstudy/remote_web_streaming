@@ -386,8 +386,11 @@ async def frontend():
             }
         }
 
-        function connectWebSocket() {
-            if (ws && ws.readyState === WebSocket.OPEN) return;
+        function connectWebSocket(onOpenCallback) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if(onOpenCallback) onOpenCallback();
+                return;
+            }
 
             log('🔄 Connecting WebSocket...');
             const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -398,6 +401,7 @@ async def frontend():
             ws.onopen = () => {
                 log('✅ WebSocket connected!');
                 updateStatus('WebSocket Connected', 'connected');
+                if (onOpenCallback) onOpenCallback();
             };
 
             ws.onmessage = (event) => {
@@ -455,16 +459,15 @@ async def frontend():
                     log(`🚀 Task execution started`);
                     updateStatus('Task Executing...', 'info');
 
-                    // Connect WebSocket for updates
-                    connectWebSocket();
-
-                    // Send execute command via WebSocket
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: 'execute_task',
-                            task_id: taskData.task_id
-                        }));
-                    }
+                    // Connect WebSocket for updates and send execute command on open
+                    connectWebSocket(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                             ws.send(JSON.stringify({
+                                type: 'execute_task',
+                                task_id: taskData.task_id
+                            }));
+                        }
+                    });
                 }
 
                 input.value = '';
