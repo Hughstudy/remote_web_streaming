@@ -66,7 +66,7 @@ sleep 2
 echo "Starting Chrome with debug port..."
 export DISPLAY=:1
 # Find Playwright's Chromium
-CHROMIUM_PATH=$(find /app/venv/lib/python*/site-packages/playwright/driver/package/.local-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)
+CHROMIUM_PATH=$(find /app/venv/lib/python3.11/site-packages/playwright/driver/package/.local-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)
 if [ -z "$CHROMIUM_PATH" ]; then
     # Fallback to system-installed locations
     CHROMIUM_PATH=$(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || which google-chrome 2>/dev/null)
