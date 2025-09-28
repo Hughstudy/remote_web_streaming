@@ -65,12 +65,8 @@ sleep 2
 # Start Chrome with debug port (CRUCIAL: This makes browser visible in VNC)
 echo "Starting Chrome with debug port..."
 export DISPLAY=:1
-# Find Playwright's Chromium
-CHROMIUM_PATH=$(find /app/venv/lib/python3.11/site-packages/playwright/driver/package/.local-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1)
-if [ -z "$CHROMIUM_PATH" ]; then
-    # Fallback to system-installed locations
-    CHROMIUM_PATH=$(which chromium-browser 2>/dev/null || which chromium 2>/dev/null || which google-chrome 2>/dev/null)
-fi
+# Find Playwright's Chromium using the reliable Python method
+CHROMIUM_PATH=$(/app/venv/bin/python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print(p.chromium.executable_path); p.stop()")
 
 if [ -n "$CHROMIUM_PATH" ]; then
     echo "Found Chrome/Chromium at: $CHROMIUM_PATH"
