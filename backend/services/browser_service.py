@@ -56,9 +56,6 @@ class BrowserService:
                 browser=self.browser
             )
 
-            # Start agent services
-            await self.agent.start()
-
             print("Browser service connected to existing Chrome on debug port 9222")
 
         except Exception as e:
@@ -68,11 +65,6 @@ class BrowserService:
     async def stop(self):
         """Clean up browser resources"""
         try:
-            # Gracefully stop the agent's services
-            if self.agent:
-                await self.agent.stop()
-                self.agent = None
-            
             # We don't kill the browser here because it's managed externally
             # and we want to reuse it. The keep_alive=True flag is important.
             print("Browser service stopped, but browser remains alive for reuse.")
