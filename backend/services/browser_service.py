@@ -10,6 +10,7 @@ class BrowserService:
     def __init__(self):
         self.agent: Optional[Agent] = None
         self.browser: Optional[Browser] = None
+        self.llm: Optional[ChatOpenAI] = None
 
         # Configuration from environment
         self.headless = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
@@ -30,7 +31,7 @@ class BrowserService:
                 # Use Gemini 2.5 Flash model (works with both OpenAI and OpenRouter)
                 model = "google/gemini-2.5-flash" if "openrouter" in openai_base_url else "gpt-4o"
 
-                llm = ChatOpenAI(
+                self.llm = ChatOpenAI(
                     model=model,
                     api_key=openai_api_key,
                     base_url=openai_base_url
@@ -49,14 +50,8 @@ class BrowserService:
                 keep_alive=True
             )
 
-            # Create agent - browser-use will connect to existing Chrome
-            self.agent = Agent(
-                task="",  # Will be set when executing tasks
-                llm=llm,
-                browser=self.browser
-            )
-
-            print("Browser service connected to existing Chrome on debug port 9222")
+            # Do not create a long-lived agent. One will be created per task.
+            print("Browser service initialized and connected to Chrome.")
 
         except Exception as e:
             print(f"Error starting browser service: {e}")
@@ -73,15 +68,19 @@ class BrowserService:
 
     async def execute_task(self, instruction: str, max_steps: int = 10):
         """Execute a task using browser-use agent"""
-        if not self.agent:
+        if not self.browser or not self.llm:
             raise Exception("Browser service not started")
 
         try:
-            # Update agent task
-            self.agent.task = instruction
+            # Create a new agent for each task to ensure a clean state
+            agent = Agent(
+                task=instruction,
+                llm=self.llm,
+                browser=self.browser
+            )
 
             # Execute the task
-            result = await self.agent.run(max_steps=max_steps)
+            result = await agent.run(max_steps=max_steps)
             return result
         except Exception as e:
             print(f"Error executing task: {e}")
@@ -106,5 +105,6 @@ class BrowserService:
         raise Exception("Chrome debug port not available after maximum retries")
 
     def get_agent(self):
-        """Get the browser-use agent instance"""
-        return self.agent
+        """Get the browser-use agent instance - DEPRECATED"""
+        print("get_agent is deprecated as agents are now created per-task")
+        return None
