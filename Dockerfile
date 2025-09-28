@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     python3.11 python3.11-venv python3-pip python3.11-dev \
     wget gnupg ca-certificates procps \
-    xvfb x11vnc websockify \
+    xvfb x11vnc \
     xterm x11-utils \
     curl wget git \
     libnss3 libatk-bridge2.0-0 libdrm2 libgtk-3-0 libgbm1 \
@@ -22,7 +22,7 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY requirements.txt .
 RUN uv venv --python 3.11 /app/venv
 ENV PATH="/app/venv/bin:$PATH"
-RUN uv pip install -r requirements.txt
+RUN uv pip install -r requirements.txt websockify
 
 # Install Playwright browsers
 RUN playwright install chromium --with-deps
@@ -59,7 +59,7 @@ sleep 2
 
 # Start websockify (WebSocket proxy)
 echo "Starting websockify..."
-websockify 6901 127.0.0.1:5901 &
+/app/venv/bin/websockify --verbose 6901 127.0.0.1:5901 &
 sleep 2
 
 # Start Chrome with debug port (CRUCIAL: This makes browser visible in VNC)
