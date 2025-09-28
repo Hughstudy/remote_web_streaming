@@ -135,14 +135,20 @@ async def websocket_endpoint(websocket: WebSocket):
             # Listen for messages from client
             data = await websocket.receive_json()
 
-            if data["type"] == "execute_task":
-                task_id = data["task_id"]
+            if data.get("type") == "execute_task":
+                task_id = data.get("task_id")
+                if not task_id:
+                    await connection_manager.send_personal_message({
+                        "type": "error",
+                        "message": "task_id is required for execute_task"
+                    }, websocket)
+                    continue
 
                 # Execute task with AI agent
                 async for update in ai_service.execute_task(task_id):
                     await connection_manager.send_personal_message(update, websocket)
 
-            elif data["type"] == "get_vnc_info":
+            elif data.get("type") == "get_vnc_info":
                 # Static VNC info for supervisor-managed VNC setup
                 # Use the same host as the API request came from
                 host = websocket.headers.get('host', 'localhost').split(':')[0]
