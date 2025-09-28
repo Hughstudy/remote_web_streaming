@@ -59,7 +59,7 @@ sleep 2
 
 # Start websockify (WebSocket proxy)
 echo "Starting websockify..."
-/app/venv/bin/websockify --verbose 6901 127.0.0.1:5901 &
+/app/venv/bin/websockify --verbose 0.0.0.0:6901 127.0.0.1:5901 &
 sleep 2
 
 # Start Chrome with debug port (CRUCIAL: This makes browser visible in VNC)
